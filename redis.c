@@ -4387,10 +4387,10 @@ static void setupSigSegvAction(void) {
      * is used. Otherwise, sa_handler is used */
     act.sa_flags = SA_NODEFER | SA_ONSTACK | SA_RESETHAND | SA_SIGINFO;
     act.sa_sigaction = segvHandler;
-    sigaction (SIGSEGV, &act, NULL);
-    sigaction (SIGBUS, &act, NULL);
-    sigaction (SIGFPE, &act, NULL);
-    sigaction (SIGILL, &act, NULL);
+    sigaction (SIGSEGV, &act, NULL); // 进程进行了一次无效的内存引用
+    sigaction (SIGBUS, &act, NULL); // 硬件故障
+    sigaction (SIGFPE, &act, NULL); // 算数运算异常 如除以0
+    sigaction (SIGILL, &act, NULL); // 非法硬件指令
     sigaction (SIGBUS, &act, NULL);
     return;
 }
