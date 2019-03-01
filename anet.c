@@ -210,39 +210,51 @@ int anetWrite(int fd, char *buf, int count)
 int anetTcpServer(char *err, int port, char *bindaddr)
 {
     int s, on = 1;
-    struct sockaddr_in sa;
-    
-    if ((s = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        anetSetError(err, "socket: %s\n", strerror(errno));
-        return ANET_ERR;
+    struct addrinfo hints, *res;
+    int status;
+    char _port[6];
+
+    snprintf(_port, 6, "%d", port);
+
+    bzero(&hints, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
+
+    if ((status = getaddrinfo(bindaddr, _port, &hints, &res)) != 0) {
+        anetSetError(err, "getaddrinfo: %s\n", gai_strerror(status));
+        goto error;
     }
+
+    if ((s = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) == -1) {
+        anetSetError(err, "socket: %s\n", strerror(errno));
+        goto error;
+    }
+
     if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) == -1) {
         anetSetError(err, "setsockopt SO_REUSEADDR: %s\n", strerror(errno));
         close(s);
-        return ANET_ERR;
+        goto error;
     }
-    memset(&sa,0,sizeof(sa));
-    sa.sin_family = AF_INET;
-    sa.sin_port = htons(port);
-    sa.sin_addr.s_addr = htonl(INADDR_ANY);
-    if (bindaddr) {
-        if (inet_aton(bindaddr, &sa.sin_addr) == 0) {
-            anetSetError(err, "Invalid bind address\n");
-            close(s);
-            return ANET_ERR;
-        }
-    }
-    if (bind(s, (struct sockaddr*)&sa, sizeof(sa)) == -1) {
+
+    if (bind(s, res->ai_addr, res->ai_addrlen) == -1) {
         anetSetError(err, "bind: %s\n", strerror(errno));
         close(s);
-        return ANET_ERR;
+        goto error;
     }
+
     if (listen(s, 64) == -1) {
         anetSetError(err, "listen: %s\n", strerror(errno));
         close(s);
-        return ANET_ERR;
+        goto error;
     }
+
+    freeaddrinfo(res);
     return s;
+
+error:
+    freeaddrinfo(res);
+    return ANET_ERR;
 }
 
 int anetAccept(char *err, int serversock, char *ip, int *port)
